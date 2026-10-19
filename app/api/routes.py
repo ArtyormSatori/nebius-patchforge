@@ -1,7 +1,10 @@
 """FastAPI API routes for PatchForge-Nemotron."""
 
-from typing import List, Dict
-from fastapi import APIRouter, HTTPException
+import asyncio
+import json
+from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from app.config import settings
 from app.core.models import PatchRequest, PatchJobResult
 from app.core.presets import PRESET_SCENARIOS
@@ -50,6 +53,47 @@ async def analyze_and_patch(request: PatchRequest):
     return result
 
 
+@router.post("/patch/stream")
+async def analyze_and_patch_stream(request: PatchRequest):
+    """Trigger autonomous remediation pipeline with Server-Sent Events (SSE) streaming."""
+    async def event_generator():
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def sync_emit(event: str, data: Dict[str, Any]):
+            queue.put_nowait((event, data))
+
+        async def run_pipeline():
+            try:
+                res = await _pipeline.execute(request, event_callback=sync_emit)
+                _JOBS_STORE[res.job_id] = res
+            except Exception as e:
+                sync_emit("job_failed", {"error": str(e)})
+            finally:
+                queue.put_nowait(("__DONE__", {}))
+
+        task = asyncio.create_task(run_pipeline())
+
+        try:
+            while True:
+                event, data = await queue.get()
+                if event == "__DONE__":
+                    break
+                payload = json.dumps({"event": event, "data": data}, default=str)
+                yield f"event: {event}\ndata: {payload}\n\n"
+        finally:
+            await task
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/patch/jobs", response_model=List[PatchJobResult])
 async def list_jobs():
     """List all recently processed patch jobs."""
@@ -57,8 +101,27 @@ async def list_jobs():
 
 
 @router.get("/patch/job/{job_id}", response_model=PatchJobResult)
+@router.get("/patch/jobs/{job_id}", response_model=PatchJobResult)
 async def get_job(job_id: str):
     """Retrieve details of a specific patch job by ID."""
     if job_id not in _JOBS_STORE:
         raise HTTPException(status_code=404, detail="Job not found")
     return _JOBS_STORE[job_id]
+
+
+@router.get("/patch/job/{job_id}/download")
+@router.get("/patch/jobs/{job_id}/download")
+async def download_patch(job_id: str):
+    """Download unified diff patch file for a given job."""
+    if job_id not in _JOBS_STORE:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job = _JOBS_STORE[job_id]
+    if not job.proposal or not job.proposal.unified_diff:
+        raise HTTPException(status_code=400, detail="Patch diff not available for this job")
+
+    filename = f"{job_id}.patch"
+    return Response(
+        content=job.proposal.unified_diff,
+        media_type="text/x-diff",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

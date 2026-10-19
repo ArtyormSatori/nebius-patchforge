@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  patchforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: patchforge-nemotron
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - NEBIUS_API_KEY=${NEBIUS_API_KEY:-}
+      - NEBIUS_MODEL_FAST=${NEBIUS_MODEL_FAST:-nvidia/nemotron-mini-4b-instruct}
+      - NEBIUS_MODEL_REASONING=${NEBIUS_MODEL_REASONING:-nvidia/nemotron-4-340b-instruct}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -76,6 +76,7 @@ class PatchVerification(BaseModel):
     lint_messages: List[str] = Field(default_factory=list, description="Lint messages or warnings")
     tests_passed: bool = Field(default=True, description="Whether automated sanity checks pass")
     details: str = Field(default="", description="Diagnostic details")
+    diff_stats: Dict[str, Any] = Field(default_factory=dict, description="Diff line statistics (additions, deletions)")
 
 
 class PatchJobResult(BaseModel):

@@ -18,6 +18,17 @@ def test_syntax_checker_python_invalid():
     assert len(errors) > 0
 
 
+def test_syntax_checker_generic_brackets():
+    valid_js = "function add(a, b) { return a + b; }"
+    ok, errors = PatchVerifier.verify_syntax(valid_js, Language.JAVASCRIPT)
+    assert ok is True
+
+    invalid_js = "function add(a, b) { return (a + b; }"
+    ok, errors = PatchVerifier.verify_syntax(invalid_js, Language.JAVASCRIPT)
+    assert ok is False
+    assert len(errors) > 0
+
+
 def test_unified_diff_validation():
     valid_diff = """--- a/app.py
 +++ b/app.py
@@ -43,3 +54,6 @@ def test_patch_verifier_full_suite():
     assert ver.applied_cleanly is True
     assert ver.syntax_ok is True
     assert ver.tests_passed is True
+    assert ver.diff_stats["additions"] == 1
+    assert ver.diff_stats["deletions"] == 1
+    assert ver.diff_stats["net_lines"] == 0

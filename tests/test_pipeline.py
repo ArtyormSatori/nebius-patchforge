@@ -33,6 +33,7 @@ def test_pipeline_sqli_scenario():
     assert "SELECT" in result.proposal.patched_code
     assert result.verification is not None
     assert result.verification.tests_passed is True
+    assert "additions" in result.verification.diff_stats
 
     # Check that events fired in order
     assert "job_started" in events
@@ -63,5 +64,51 @@ def test_pipeline_path_traversal_scenario():
     assert result.triage.error_type == "PathTraversal"
     assert result.proposal is not None
     assert "realpath" in result.proposal.patched_code or "safe_path" in result.proposal.patched_code
+    assert result.verification is not None
+    assert result.verification.tests_passed is True
+
+
+def test_pipeline_ssrf_scenario():
+    preset = [p for p in PRESET_SCENARIOS if p["id"] == "cwe-918-ssrf"][0]
+    request = PatchRequest(
+        title=preset["title"],
+        error_log=preset["error_log"],
+        code_context=preset["code_context"],
+        file_path=preset["file_path"],
+        language=Language(preset["language"]),
+        enable_tavily_search=True,
+    )
+
+    pipeline = PatchForgePipeline()
+    result = asyncio.run(pipeline.execute(request))
+
+    assert result.status == "COMPLETED"
+    assert result.triage is not None
+    assert result.triage.error_type == "ServerSideRequestForgery"
+    assert result.proposal is not None
+    assert "is_safe_webhook_url" in result.proposal.patched_code
+    assert result.verification is not None
+    assert result.verification.tests_passed is True
+
+
+def test_pipeline_deserialization_scenario():
+    preset = [p for p in PRESET_SCENARIOS if p["id"] == "cwe-502-insecure-deserialization"][0]
+    request = PatchRequest(
+        title=preset["title"],
+        error_log=preset["error_log"],
+        code_context=preset["code_context"],
+        file_path=preset["file_path"],
+        language=Language(preset["language"]),
+        enable_tavily_search=True,
+    )
+
+    pipeline = PatchForgePipeline()
+    result = asyncio.run(pipeline.execute(request))
+
+    assert result.status == "COMPLETED"
+    assert result.triage is not None
+    assert result.triage.error_type == "InsecureDeserialization"
+    assert result.proposal is not None
+    assert "json.loads" in result.proposal.patched_code
     assert result.verification is not None
     assert result.verification.tests_passed is True

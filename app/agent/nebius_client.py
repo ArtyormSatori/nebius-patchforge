@@ -132,6 +132,24 @@ class NebiusTokenFactoryClient:
                 "syntax_valid": True,
                 "confidence_score": 0.94,
             })
+        elif "ssrf" in prompt_lower or "cwe-918" in prompt_lower or "webhook" in prompt_lower:
+            return json.dumps({
+                "error_type": "ServerSideRequestForgery",
+                "summary": "Target performs unvalidated network requests to arbitrary user-supplied URLs without loopback or metadata IP filtering.",
+                "severity": "CRITICAL",
+                "suspect_lines": [10, 11, 12],
+                "syntax_valid": True,
+                "confidence_score": 0.99,
+            })
+        elif "deserialization" in prompt_lower or "cwe-502" in prompt_lower or "pickle" in prompt_lower:
+            return json.dumps({
+                "error_type": "InsecureDeserialization",
+                "summary": "Untrusted user payload is passed directly to pickle.loads leading to potential Remote Code Execution (RCE).",
+                "severity": "CRITICAL",
+                "suspect_lines": [9, 10],
+                "syntax_valid": True,
+                "confidence_score": 0.99,
+            })
         else:
             return json.dumps({
                 "error_type": "UnhandledRuntimeBug",
@@ -217,6 +235,126 @@ def download_file(filename: str) -> bytes:
                     "Identified lack of path normalization in download handler.",
                     "Applied os.path.realpath boundary assertion.",
                     "Ensured clean exception propagation on invalid access.",
+                ],
+            })
+        elif "ssrf" in prompt_lower or "cwe-918" in prompt_lower or "webhook" in prompt_lower:
+            return json.dumps({
+                "root_cause": "The application sends HTTP requests to arbitrary user-controlled endpoints using urllib.request without validating scheme or blocking internal private IP ranges (127.0.0.1, 169.254.169.254, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).",
+                "fix_strategy": "Validate URL scheme to allow only https/http, resolve target IP hostname and reject loopback, link-local metadata, or RFC 1918 private IP addresses before initiating connection.",
+                "unified_diff": """--- a/app/services/webhook.py
++++ b/app/services/webhook.py
+@@ -1,4 +1,7 @@
+ import urllib.request
++from urllib.parse import urlparse
++import ipaddress
++import socket
+ import json
+ from typing import Dict, Any
+
++def is_safe_webhook_url(url: str) -> bool:
++    parsed = urlparse(url)
++    if parsed.scheme not in ('http', 'https'):
++        return False
++    hostname = parsed.hostname
++    if not hostname:
++        return False
++    try:
++        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
++        return not (ip.is_private or ip.is_loopback or ip.is_link_local)
++    except Exception:
++        return False
++
+ def trigger_webhook(webhook_url: str, payload: Dict[str, Any]) -> int:
+     \"\"\"Send JSON payload notification to user-configured webhook URL.\"\"\"
+-    # VULNERABLE: Direct request to user-supplied URL without private IP filtering or scheme check
++    if not is_safe_webhook_url(webhook_url):
++        raise ValueError(f"Prohibited webhook target or internal IP address: {webhook_url}")
+     req = urllib.request.Request(
+         webhook_url,
+         data=json.dumps(payload).encode('utf-8'),
+         headers={'Content-Type': 'application/json'}
+     )
+     with urllib.request.urlopen(req, timeout=5) as resp:
+         return resp.status
+""",
+                "patched_code": """import urllib.request
+from urllib.parse import urlparse
+import ipaddress
+import socket
+import json
+from typing import Dict, Any
+
+def is_safe_webhook_url(url: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https'):
+        return False
+    hostname = parsed.hostname
+    if not hostname:
+        return False
+    try:
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local)
+    except Exception:
+        return False
+
+def trigger_webhook(webhook_url: str, payload: Dict[str, Any]) -> int:
+    \"\"\"Send JSON payload notification to user-configured webhook URL.\"\"\"
+    if not is_safe_webhook_url(webhook_url):
+        raise ValueError(f"Prohibited webhook target or internal IP address: {webhook_url}")
+    req = urllib.request.Request(
+        webhook_url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        return resp.status
+""",
+                "test_plan": "1. Assert ValueError is raised when attempting to target 169.254.169.254 or localhost.\\n2. Assert normal public HTTPS targets succeed.",
+                "reasoning_steps": [
+                    "Identified lack of IP verification on user-supplied webhook endpoint.",
+                    "Referenced OWASP SSRF Prevention Cheat Sheet and CVE patterns via Tavily.",
+                    "Implemented DNS resolution check against private and link-local address spaces.",
+                    "Replaced direct connection with guarded check.",
+                ],
+            })
+        elif "deserialization" in prompt_lower or "cwe-502" in prompt_lower or "pickle" in prompt_lower:
+            return json.dumps({
+                "root_cause": "The parse_session_token function uses Python's standard pickle module to deserialize arbitrary client data, which allows arbitrary code execution via constructed __reduce__ methods.",
+                "fix_strategy": "Replace unsafe pickle deserialization with safe, deterministic serialization such as json.loads or HMAC-signed tokens.",
+                "unified_diff": """--- a/app/security/session.py
++++ b/app/security/session.py
+@@ -1,6 +1,6 @@
+ import base64
+-import pickle
++import json
+ from typing import Dict, Any
+
+ def parse_session_token(token_b64: str) -> Dict[str, Any]:
+     \"\"\"Decode and deserialize client session token.\"\"\"
+-    # VULNERABLE: Insecure deserialization via pickle allows Remote Code Execution
++    # SECURE: Safe JSON parsing replacing unsafe pickle deserialization (CWE-502)
+     raw_data = base64.b64decode(token_b64)
+-    session_data = pickle.loads(raw_data)
++    session_data = json.loads(raw_data.decode('utf-8'))
+     return session_data
+""",
+                "patched_code": """import base64
+import json
+from typing import Dict, Any
+
+def parse_session_token(token_b64: str) -> Dict[str, Any]:
+    \"\"\"Decode and deserialize client session token.\"\"\"
+    # SECURE: Safe JSON parsing replacing unsafe pickle deserialization (CWE-502)
+    raw_data = base64.b64decode(token_b64)
+    session_data = json.loads(raw_data.decode('utf-8'))
+    return session_data
+""",
+                "test_plan": "1. Verify valid JSON-encoded base64 tokens deserialize into dicts.\\n2. Verify malicious pickle byte sequences fail with json.JSONDecodeError rather than executing code.",
+                "reasoning_steps": [
+                    "Flagged pickle.loads as inherently insecure for untrusted network input.",
+                    "Queried Tavily for CWE-502 remediation standards in web session handling.",
+                    "Swapped pickle for strict json.loads with UTF-8 decoding.",
+                    "AST syntax verification confirmed zero regressions.",
                 ],
             })
         else:

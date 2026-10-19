@@ -78,7 +78,22 @@ class PatchVerifier:
         applied_cleanly = diff_valid and (original_code != patched_code)
         tests_passed = syntax_ok and applied_cleanly
 
-        details = "Patch verification PASSED: syntax is clean, diff structure is valid, changes detected."
+        # Compute diff line metrics (additions / deletions)
+        additions = 0
+        deletions = 0
+        for line in unified_diff.splitlines():
+            if line.startswith("+") and not line.startswith("+++"):
+                additions += 1
+            elif line.startswith("-") and not line.startswith("---"):
+                deletions += 1
+
+        diff_stats = {
+            "additions": additions,
+            "deletions": deletions,
+            "net_lines": additions - deletions,
+        }
+
+        details = f"Patch verification PASSED: syntax is clean, diff structure is valid (+{additions}/-{deletions} lines)."
         if not tests_passed:
             details = f"Patch verification FAILED: {'; '.join(lint_messages)}"
 
@@ -88,4 +103,5 @@ class PatchVerifier:
             lint_messages=lint_messages,
             tests_passed=tests_passed,
             details=details,
+            diff_stats=diff_stats,
         )

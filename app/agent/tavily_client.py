@@ -85,6 +85,34 @@ class TavilySearchClient:
                 ),
             ]
             summary = "Remediation consensus: Canonicalize file paths with os.path.realpath and verify base directory containment."
+        elif "ssrf" in q_lower or "cwe-918" in q_lower or "webhook" in q_lower:
+            hits = [
+                SearchHit(
+                    title="OWASP Server-Side Request Forgery Prevention Cheat Sheet",
+                    url="https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+                    snippet="Enforce URL scheme to http/https, resolve destination hostnames, and block connections to private, loopback, or cloud instance metadata (169.254.169.254) addresses.",
+                ),
+                SearchHit(
+                    title="CWE-918: Server-Side Request Forgery (SSRF)",
+                    url="https://cwe.mitre.org/data/definitions/918.html",
+                    snippet="Validate and sanitize user-supplied URLs against an explicit allowlist of domains or verify resolved IP against internal network blacklists.",
+                ),
+            ]
+            summary = "Remediation consensus: Validate URL scheme, resolve DNS hostname, and block private/link-local/metadata IP addresses."
+        elif "deserialization" in q_lower or "cwe-502" in q_lower or "pickle" in q_lower:
+            hits = [
+                SearchHit(
+                    title="OWASP Deserialization Cheat Sheet",
+                    url="https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html",
+                    snippet="Do not deserialize untrusted data with formats that support arbitrary object instantiation (e.g., Python pickle). Prefer safe, data-only formats such as JSON.",
+                ),
+                SearchHit(
+                    title="CWE-502: Deserialization of Untrusted Data",
+                    url="https://cwe.mitre.org/data/definitions/502.html",
+                    snippet="Avoid arbitrary code execution vulnerabilities by replacing pickle with JSON or cryptographically HMAC-signing serialized data.",
+                ),
+            ]
+            summary = "Remediation consensus: Replace unsafe pickle deserialization with safe JSON format or authenticated cryptographic tokens."
         else:
             hits = [
                 SearchHit(

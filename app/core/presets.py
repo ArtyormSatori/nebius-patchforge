@@ -86,4 +86,52 @@ def process_withdrawal(user_id: str, amount: float) -> bool:
     return False
 """,
     },
+    {
+        "id": "cwe-918-ssrf",
+        "title": "CWE-918: Server-Side Request Forgery in Webhook Notifier",
+        "language": "python",
+        "file_path": "app/services/webhook.py",
+        "error_log": """[SECURITY_SCAN] Critical Finding: CWE-918 Server-Side Request Forgery (SSRF)
+Location: app/services/webhook.py:line 12
+Evidence: Service performs arbitrary HTTP request to user-supplied webhook_url without IP/scheme validation.
+Exploit Vector: webhook_url="http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+Result: Cloud provider instance metadata and credentials accessed from internal network.""",
+        "code_context": """import urllib.request
+import json
+from typing import Dict, Any
+
+def trigger_webhook(webhook_url: str, payload: Dict[str, Any]) -> int:
+    \"\"\"Send JSON payload notification to user-configured webhook URL.\"\"\"
+    # VULNERABLE: Direct request to user-supplied URL without private IP filtering or scheme check
+    req = urllib.request.Request(
+        webhook_url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        return resp.status
+""",
+    },
+    {
+        "id": "cwe-502-insecure-deserialization",
+        "title": "CWE-502: Insecure Deserialization in Session Token Parser",
+        "language": "python",
+        "file_path": "app/security/session.py",
+        "error_log": """[SECURITY_AUDIT] Critical Alert: CWE-502 Deserialization of Untrusted Data
+Location: app/security/session.py:line 10
+Evidence: Insecure use of pickle.loads on client-provided session token.
+Exploit Vector: Remote code execution via __reduce__ payload in base64 cookie.
+Result: Arbitrary OS command execution inside application worker.""",
+        "code_context": """import base64
+import pickle
+from typing import Dict, Any
+
+def parse_session_token(token_b64: str) -> Dict[str, Any]:
+    \"\"\"Decode and deserialize client session token.\"\"\"
+    # VULNERABLE: Insecure deserialization via pickle allows Remote Code Execution
+    raw_data = base64.b64decode(token_b64)
+    session_data = pickle.loads(raw_data)
+    return session_data
+""",
+    },
 ]

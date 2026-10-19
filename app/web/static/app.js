@@ -209,6 +209,16 @@ function renderResults(job) {
     // 4. Patch diff
     document.getElementById("patch-card").classList.remove("hidden");
     renderDiff(job.proposal.unified_diff);
+
+    // Diff stats badge
+    const statsBadge = document.getElementById("diff-stats-badge");
+    if (statsBadge && job.verification && job.verification.diff_stats) {
+      const stats = job.verification.diff_stats;
+      statsBadge.textContent = `+${stats.additions || 0} / -${stats.deletions || 0} lines`;
+      statsBadge.classList.remove("hidden");
+    } else if (statsBadge) {
+      statsBadge.classList.add("hidden");
+    }
   }
 
   // 5. Verification Card
@@ -266,4 +276,22 @@ function downloadPatch() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function copyPatch() {
+  if (!currentJob || !currentJob.proposal || !currentJob.proposal.unified_diff) {
+    alert("No active patch available to copy.");
+    return;
+  }
+  navigator.clipboard.writeText(currentJob.proposal.unified_diff).then(() => {
+    const btnText = document.getElementById("copy-btn-text");
+    if (btnText) {
+      btnText.textContent = "Copied!";
+      setTimeout(() => {
+        btnText.textContent = "Copy";
+      }, 2000);
+    }
+  }).catch((err) => {
+    console.error("Clipboard copy failed:", err);
+  });
 }
