@@ -1,0 +1,24 @@
+{
+  "executed_at": "2026-10-21T09:26:17.202711+00:00",
+  "via": "app.agent.tavily_client.TavilySearchClient.search (PatchForge pipeline step 2, live mode)",
+  "query": "SQLInjection Python fix advisory",
+  "live_call": true,
+  "summary": "To fix an SQL injection vulnerability in the Snowflake Connector for Python, upgrade to version 3.13.1 as it patches the issue affecting versions 2.2.5 through 3.13.0. For python-sql, upgrade to version 1.5.2 to address the vulnerability. The sources do not provide a definitive answer for other potential SQL injection fixes.",
+  "results": [
+    {
+      "title": "SQL Injection in write_pandas · Advisory · snowflakedb/snowflake-connector-python · GitHub",
+      "url": "https://github.com/snowflakedb/snowflake-connector-python/security/advisories/GHSA-2vpq-fh52-j3wv",
+      "snippet": "### Solution\n\nSnowflake released version 3.13.1 of the Snowflake Connector for Python, which fixes this issue. We recommend users upgrade to version 3.13.1.\n\n### Additional Information\n\nIf you discove"
+    },
+    {
+      "title": "python-sql SQL injection vulnerability · CVE-2024-9774 · GitHub Advisory Database · GitHub",
+      "url": "https://github.com/advisories/GHSA-pq9p-pc3p-9hm4",
+      "snippet": "< 1.5.2\n\n## Patched versions\n\n1.5.2\n\n## Description\n\nA vulnerability was found in python-sql where unary operators do not escape non-Expression (like `And` and `Or`) which makes any system exposing th"
+    },
+    {
+      "title": "Preventing SQL Injection in Python",
+      "url": "https://www.youtube.com/watch?v=1cQy9N1Xndk",
+      "snippet": "# Preventing SQL Injection in Python\n## Channel: SANS Cloud Security\n13.1K subscribers\n33 likes\n\n### Description\n1,526 views\nPosted: 2024-05-28\nSANS Cloud Security focuses the deep resources of SANS o"
+    }
+  ]
+}
